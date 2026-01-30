@@ -48,8 +48,8 @@ from selenium.webdriver.common.by import By
 from selenium.common.exceptions import TimeoutException
 from datetime import datetime
 
-async def request_page(url, page_limit):
-    """ Returns BeautifulSoup4 Objects (soup)"""
+async def request_page(url, item_limit):
+    """ Returns BeautifulSoup4 Objects (soup) based on item count """
 
     opts = Options()
     opts.add_argument("--log-level=3")
@@ -59,14 +59,19 @@ async def request_page(url, page_limit):
     driver.minimize_window()
 
     driver.get(url)
-    page = 1
     timeout = 10
 
-    while page < page_limit:
+    while True:
+        current_items = driver.find_elements(By.CSS_SELECTOR, ".asm-browse-listings > div > div > div")
+        
+        if len(current_items) >= item_limit:
+            break
+            
         try:
             next_page_btn = WebDriverWait(driver, timeout).until(EC.presence_of_element_located((By.XPATH, '//button[contains(text(), "Show more results")]')))  # wait max timeout sec for loading
             driver.execute_script("arguments[0].click();", next_page_btn)  # click the load more button through ads
-            page += 1
+            
+            await asyncio.sleep(1.5) 
         except TimeoutException:
             print("Button not found, reached end of page or load more button not found.")
             break
@@ -100,17 +105,17 @@ def parse_info(item_div, home,):
 
 async def main(options: Union[dict, None] = None):
     os.makedirs("output", exist_ok=True)
-    """options keys: i (item), p (page), o (output), t (test), s (serialize), c (compare)"""
+    """options keys: i (item), n (number/count), o (output), t (test), s (serialize), c (compare)"""
     if options is None:
         server_side = False
         ps = argparse.ArgumentParser()
         ps.add_argument('-i', '--item', type=str, help='Name of the item to scrape')
-        ps.add_argument('-p', '--page', type=int, help='Number of pages (approx 46 per page)')
+        ps.add_argument('-n', '--number', type=int, help='Number of items to scrape')
         ps.add_argument('-o', '--output', type=str,
             help='CSV file to write out to, defaults to timestamped')
         ps.add_argument('-t', '--test', action='store_true',
             help=r'''For debugging of parsers which could break often due to the changing structure,
-            using a snapshot of a bs4 object while overriding these flags with the respective values: -i shirakami fubuki -p 1''')
+            using a snapshot of a bs4 object while overriding these flags with the respective values: -i shirakami fubuki -n 10''')
         ps.add_argument('-s', '--serialize', action='store_true',
             help=r'''For debugging of parsers which could break often due to the changing structure,
             the BS4 object is serialised for fast access, must not have -t''')
@@ -121,8 +126,8 @@ async def main(options: Union[dict, None] = None):
         if args.test:
             test = True
             item = 'test'
-            page_limit = 1
-            if args.item or args.page:
+            item_limit = 10
+            if args.item or args.number:
                 print('Entered test mode, overriding some user provided arguments')
         else:
             test = False
@@ -130,13 +135,13 @@ async def main(options: Union[dict, None] = None):
                 item = args.item
             else:
                 item = input('-i Item name: ')
-            if args.page:
-                page_limit = args.page
+            if args.number:
+                item_limit = args.number
             else:
                 while True:
-                    inp = input('-p Number of pages (approx 50 per page): ')
+                    inp = input('-n Number of items to scrape: ')
                     if inp.isdigit():
-                        page_limit = int(inp)
+                        item_limit = int(inp)
                         break
                     print("Invalid integer")
 
@@ -160,11 +165,11 @@ async def main(options: Union[dict, None] = None):
         server_side = True
         item = options.get("i")
         output_file = options.get("o")
-        page_limit = options.get("p")
+        item_limit = options.get("n", 25)
         if options.get("t"):
             test = True
             item = 'shirakami fubuki'
-            page_limit = 1
+            item_limit = 10
         else:
             test = False
         serialize = options.get("s")
@@ -180,13 +185,13 @@ async def main(options: Union[dict, None] = None):
 
     try:
         if not server_side:
-            print(f'Retrieving search results on {item}...')
+            print(f'Retrieving search results for {item_limit} items on {item}...')
         if not test:
             if not server_side:
                 print("Creating webdriver")
-            search_results_soup = await request_page(home+subdirs+parameters, page_limit=page_limit)
+            search_results_soup = await request_page(home+subdirs+parameters, item_limit=item_limit)
             if not server_side:
-                print(f'All results loaded. Total: {page_limit} pages.')
+                print(f'Target reached or button exhausted.')
             if serialize:
                 with open("./utils/soup.pkl", "wb") as f:
                     pickle.dump(search_results_soup, f)
@@ -201,9 +206,9 @@ async def main(options: Union[dict, None] = None):
             print(f'Detected item_divs class: {item_divs_class}')
         item_divs = search_results_soup.find_all('div', class_=item_divs_class)  # ads
         if not server_side:
-            print(f'Found {len(item_divs)} listings. Parsing...')
-    except AttributeError:  # no item_divs at all
-        print('The search has returned no result.')
+            print(f'Found {len(item_divs)} potential listings. Parsing...')
+    except (AttributeError, FileNotFoundError):  # no item_divs at all
+        print('The search has returned no result or serialized file missing.')
         sys.exit(1)
 
     tries = 1
@@ -212,6 +217,8 @@ async def main(options: Union[dict, None] = None):
             items_list = []
             for item_div in item_divs:
                 items_list.append(parse_info(item_div, home))
+                if len(items_list) >= item_limit:
+                    break
             break
         except IndexError:
             print(traceback.format_exc())
