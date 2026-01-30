@@ -64,7 +64,7 @@ async def request_page(url, item_limit):
     while True:
         current_items = driver.find_elements(By.CSS_SELECTOR, ".asm-browse-listings > div > div > div")
         
-        if len(current_items) >= item_limit:
+        if len(current_items) >= int(item_limit * 1.1):
             break
             
         try:
@@ -88,6 +88,9 @@ def parse_info(item_div, home,):
     Parses the item_div and returns the list of items
     """
     a = item_div.find_all('a', recursive=False)
+    if len(a) < 2:
+        raise ValueError("Div does not contain expected seller and item links.")
+
     seller_divs = a[0].find_all('div', recursive=False)[1]
     item_p = a[1].find_all('p', recursive=False)
     img = item_div.find('img')
@@ -96,7 +99,7 @@ def parse_info(item_div, home,):
             'seller_name': seller_divs.p.get_text(),
             'price': re.findall(r"FREE|\$\d{0,3},?\d+\.?\d{,2}", a[1].get_text()),
             'time_posted': seller_divs.div.p.get_text(),  # Attempt to get absolute datetime?
-            'condition': item_p[1].get_text(),
+            'condition': item_p[1].get_text() if len(item_p) > 1 else "N/A",
             'item_name': item_p[0].get_text(strip=True),
             'item_url': item_url,
             'item_img': img['src'] if img else None,
@@ -193,6 +196,7 @@ async def main(options: Union[dict, None] = None):
             if not server_side:
                 print(f'Target reached or button exhausted.')
             if serialize:
+                os.makedirs("./utils", exist_ok=True)
                 with open("./utils/soup.pkl", "wb") as f:
                     pickle.dump(search_results_soup, f)
                 print(f"Serialized: -i {item}")
@@ -211,22 +215,18 @@ async def main(options: Union[dict, None] = None):
         print('The search has returned no result or serialized file missing.')
         sys.exit(1)
 
-    tries = 1
-    while tries < 5:  # retrying loop as the div class position is random
+    items_list = []
+    for item_div in item_divs:
         try:
-            items_list = []
-            for item_div in item_divs:
-                items_list.append(parse_info(item_div, home))
-                if len(items_list) >= item_limit:
-                    break
+            items_list.append(parse_info(item_div, home))
+        except (IndexError, ValueError, AttributeError):
+            continue # Skip advertisements or malformed items
+        
+        if len(items_list) >= item_limit:
             break
-        except IndexError:
-            print(traceback.format_exc())
-            print(f'Parsing attempt {tries} failed due to class name error.\n')
-            tries += 1
-            continue
-    else:
-        print('Parsing failed as it still faces IndexError after 5 tries.')
+ 
+    if not items_list:
+        print('Parsing failed to find any valid items.')
         sys.exit(1)
  
     df = pd.DataFrame(items_list)
