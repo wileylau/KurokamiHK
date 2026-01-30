@@ -48,6 +48,20 @@ from selenium.webdriver.common.by import By
 from selenium.common.exceptions import TimeoutException
 from datetime import datetime
 
+def load_blacklist(filepath="utils/blacklist.txt"):
+    if not os.path.exists(filepath):
+        return []
+    with open(filepath, "r", encoding="utf-8") as f:
+        # Read lines, strip whitespace, and ignore empty lines
+        return [line.strip().lower() for line in f if line.strip()]
+
+def is_blacklisted(item_name, blacklist):
+    item_name_lower = item_name.lower()
+    for word in blacklist:
+        if word in item_name_lower:
+            return True
+    return False
+
 async def request_page(url, item_limit):
     """ Returns BeautifulSoup4 Objects (soup) based on item count """
 
@@ -108,6 +122,7 @@ def parse_info(item_div, home,):
 
 async def main(options: Union[dict, None] = None):
     os.makedirs("output", exist_ok=True)
+    blacklist = load_blacklist()
     """options keys: i (item), n (number/count), o (output), t (test), s (serialize), c (compare)"""
     if options is None:
         server_side = False
@@ -233,6 +248,10 @@ async def main(options: Union[dict, None] = None):
     items_list = []
     for item_div in item_divs:
         try:
+            item_data = parse_info(item_div, home)
+            if is_blacklisted(item_data['item_name'], blacklist):
+                continue
+                
             items_list.append(parse_info(item_div, home))
         except (IndexError, ValueError, AttributeError):
             continue # Skip advertisements or malformed items
