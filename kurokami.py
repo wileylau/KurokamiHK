@@ -228,14 +228,14 @@ async def main(options: Union[dict, None] = None):
         sys.exit(1)
  
     df = pd.DataFrame(items_list)
-    df.to_csv(output_file, index=False)
+    df.to_csv(output_file, index=False, encoding='utf-8-sig')
     if not server_side:
         print(f'Results saved to {output_file}')
 
     if compare_file:
         if not server_side:
             print("Comparing resuls with given csv")
-        prev_df = pd.read_csv(compare_file)
+        prev_df = pd.read_csv(compare_file, encoding='utf-8-sig')
         # df_standardized = df.iloc[:len([prev_df])] # cases where there might be extra old results appended to new df, remove these
         # new_rows = df_standardized[~df_standardized['uid'].isin(prev_df['uid'])]
         # right exclusive join, old.column != new.column so we drop all cols named x as its from left
