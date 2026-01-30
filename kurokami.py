@@ -124,6 +124,10 @@ async def main(options: Union[dict, None] = None):
             the BS4 object is serialised for fast access, must not have -t''')
         ps.add_argument('-c', '--compare', type=str,
             help='Name of a .csv file output from this program to compare with')
+        ps.add_argument('-ph', '--price-high', type=int, 
+            help='Upper price limit')
+        ps.add_argument('-pl', '--price-low', type=int,
+            help='Lower price limit')
         args = ps.parse_args()
 
         if args.test:
@@ -163,6 +167,8 @@ async def main(options: Union[dict, None] = None):
             elif not os.path.exists(compare_file):
                 print(f"{compare_file} does not exist")
                 sys.exit(1)
+        price_high = args.price_high
+        price_low = args.price_low
 
     else: # Praying that this does not result in a SSRF, used in bot.py with no user inputs yet. Validate user inputs
         server_side = True
@@ -184,8 +190,17 @@ async def main(options: Union[dict, None] = None):
 
     home = 'https://carousell.com.hk'
     subdirs = f'/search/{urllib.parse.quote(item)}'
-    parameters = '?addRecent=false&canChangeKeyword=false&includeSuggestions=false&sort_by=3'
-
+    
+    params = {
+        'addRecent': 'false',
+        'canChangeKeyword': 'false',
+        'includeSuggestions': 'false',
+        'sort_by': '3'
+    }
+    if price_low: params['price_start'] = price_low
+    if price_high: params['price_end'] = price_high
+    
+    parameters = f"?{urllib.parse.urlencode(params)}"
     try:
         if not server_side:
             print(f'Retrieving search results for {item_limit} items on {item}...')
