@@ -46,6 +46,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.common.by import By
 from selenium.common.exceptions import TimeoutException
+from datetime import datetime
 
 async def request_page(url, page_limit):
     """ Returns BeautifulSoup4 Objects (soup)"""
@@ -98,6 +99,7 @@ def parse_info(item_div, home,):
             }  # 0 is discounted price, 1 is original price, if applicable
 
 async def main(options: Union[dict, None] = None):
+    os.makedirs("output", exist_ok=True)
     """options keys: i (item), p (page), o (output), t (test), s (serialize), c (compare)"""
     if options is None:
         server_side = False
@@ -138,19 +140,12 @@ async def main(options: Union[dict, None] = None):
                         break
                     print("Invalid integer")
 
-        file_reg = r'^.?[a-zA-Z0-9_\\/\- ]+\.csv$'
-        output_file = args.output
-        if output_file:
-            if not re.match(file_reg, output_file):
-                print("Invalid CSV file name. Accepted chars: azAZ_-.csv")
-                sys.exit(1)
-            elif not os.path.exists(output_file):
-                print(f"{output_file} does not exist")
-                sys.exit(1)
+        if args.output:
+            output_file = args.output
         else:
-            print("Using default csv file format")
-            output_file = item + ".csv"
-
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            clean_item_name = item.replace(" ", "_")
+            output_file = os.path.join("output", f"{timestamp}-{clean_item_name}.csv")
         serialize = args.serialize
         compare_file = args.compare
         if compare_file:
