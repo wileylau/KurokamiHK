@@ -179,7 +179,7 @@ async def main(options: Union[dict, None] = None):
         print("Author: Andrew Higgins")
         print("https://github.com/speckly")
 
-    home = 'https://sg.carousell.com'
+    home = 'https://carousell.com.hk'
     subdirs = f'/search/{urllib.parse.quote(item)}'
     parameters = '?addRecent=false&canChangeKeyword=false&includeSuggestions=false&sort_by=3'
 
