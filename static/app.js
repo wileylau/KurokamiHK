@@ -99,6 +99,32 @@
     return a;
   }
 
+  function killBtn(id, onRemove, label, cls) {
+    var idle = label || "[x]";
+    var btn = el("button", cls || "kill", idle);
+    btn.type = "button";
+    btn.title = "remove watch w" + id + " (history.csv + state.json deleted)";
+    btn.addEventListener("click", function () {
+      if (!window.confirm("delete watch w" + id + "? its history.csv and state.json are removed from disk.")) return;
+      btn.disabled = true;
+      btn.textContent = "\u2026";
+      fetch("/api/watches/" + id, { method: "DELETE" }).then(function (r) {
+        if (!r.ok) {
+          return readJSON(r).then(function (d) { throw new Error((d && d.error) || ("HTTP " + r.status)); });
+        }
+        var s1 = document.getElementById("sline-main");
+        if (s1) s1.textContent = "-- watch w" + id + " removed \u00b7 history + state deleted --";
+        if (onRemove) onRemove();
+      })["catch"](function (err) {
+        btn.disabled = false;
+        btn.textContent = idle;
+        var s1 = document.getElementById("sline-main");
+        if (s1) s1.textContent = "-- remove failed: " + err.message + " --";
+      });
+    });
+    return btn;
+  }
+
   function emptyRow(text, colSpan) {
     var row = el("div", "roster-row row-empty");
     var span = el("span", "faint", text);
@@ -180,6 +206,11 @@
     row.appendChild(count);
 
     row.appendChild(stateCell(w));
+
+    var act = el("span", "cell-act");
+    act.dataset.cell = "act";
+    act.appendChild(killBtn(w.id, loadRoster));
+    row.appendChild(act);
     return row;
   }
 
@@ -190,7 +221,7 @@
     var existing = roster.querySelectorAll(".roster-row");
     for (var i = 0; i < existing.length; i++) existing[i].remove();
     if (!watches.length) {
-      roster.appendChild(emptyRow("\u2014 no watches yet \u2014 add one from settings", 7));
+      roster.appendChild(emptyRow("\u2014 no watches yet \u2014 add one from settings", 8));
       return;
     }
     var sorted = watches.slice().sort(function (a, b) {
@@ -234,7 +265,7 @@
     }
   }
 
-  function initRoster() {
+  function loadRoster() {
     var rollup = document.getElementById("rollup");
     Promise.all([getJSON("/api/watches"), getJSON("/api/status")]).then(function (pair) {
       var watches = pair[0];
@@ -253,6 +284,10 @@
       var roster = document.getElementById("roster");
       if (roster) roster.appendChild(emptyRow("\u2014 daemon unreachable (" + err.message + ") \u2014", 7));
     });
+  }
+
+  function initRoster() {
+    loadRoster();
   }
 
   /* ------------------------------------------------------------------ */
@@ -379,6 +414,15 @@
           btn.textContent = "[rescan]";
         });
       });
+    }
+    var kill = document.getElementById("kill");
+    if (kill) {
+      if (id) {
+        var fresh = killBtn(id, function () { location.href = "index.html"; }, "[delete]", "btn btn-delete");
+        kill.parentNode.replaceChild(fresh, kill);
+      } else {
+        kill.hidden = true;
+      }
     }
     renderResults(id);
   }
@@ -575,9 +619,14 @@
       });
     });
 
+    loadWatchList();
+  }
+
+  function loadWatchList() {
     getJSON("/api/watches").then(function (watches) {
       var list = document.getElementById("watch-list");
       if (!list) return;
+      while (list.firstChild) list.removeChild(list.firstChild);
       if (!watches.length) {
         var li = el("li", null, "\u2014 no watches yet \u2014");
         li.classList.add("faint");
@@ -596,6 +645,7 @@
           (w.status === "stalled" ? " \u2014 stalled \u2014 retry needed" : "") +
           (w.below_floor ? " \u00b7 below floor" : ""));
         li2.appendChild(st);
+        li2.appendChild(killBtn(w.id, loadWatchList));
         list.appendChild(li2);
       }
     })["catch"](function () {});

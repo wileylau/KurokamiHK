@@ -159,6 +159,10 @@ b, strong { font-weight: 700; }
 
 .btn-add { margin-left: auto; }
 
+.btn-delete { border-color: var(--red); color: var(--red-bright); }
+.btn-delete:hover { background: var(--red); color: var(--ground); }
+.btn-delete:disabled { border-color: var(--hairline); color: var(--dim-2); cursor: default; opacity: 1; }
+
 /* ---------- roster ---------- */
 
 .section-label {
@@ -180,7 +184,7 @@ b, strong { font-weight: 700; }
 
 .roster-head, .roster-row {
   display: grid;
-  grid-template-columns: 56px 1fr 64px 104px 120px 72px 1fr;
+  grid-template-columns: 56px 1fr 64px 104px 120px 72px 1fr 48px;
   gap: var(--space-1);
   align-items: baseline;
   padding: var(--space-1) var(--space-2);
@@ -199,6 +203,7 @@ b, strong { font-weight: 700; }
 .cell-id { color: var(--dim); }
 .cell-query { color: var(--bone-bright); }
 .cell-query a { color: inherit; }
+.cell-act .kill { margin-left: 0; }
 
 .num { font-variant-numeric: tabular-nums; color: var(--bone); }
 .dim { color: var(--dim); }
@@ -240,6 +245,21 @@ b, strong { font-weight: 700; }
   font-size: 0.78rem;
 }
 .retry:hover { background: var(--red); color: var(--ground); }
+
+.kill {
+  margin-left: 10px;
+  padding: 0 6px;
+  border: 1px solid var(--hairline);
+  border-radius: 5px;
+  color: var(--dim-2);
+  background: transparent;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+.kill:hover { border-color: var(--red); color: var(--red-bright); }
+.kill:disabled { color: var(--dim-2); border-color: var(--hairline); cursor: default; }
 
 /* ---------- root status line / footer ---------- */
 
@@ -456,6 +476,7 @@ legend {
 .watch-list li { padding: 5px 0; border-bottom: 1px solid var(--hairline); color: var(--dim); }
 .watch-list li a { color: var(--bone-bright); text-decoration: none; }
 .watch-list li .w-state { margin-left: 8px; color: var(--dim-2); }
+.watch-list .kill { margin-left: 8px; }
 
 /* ---------- politeness banner ---------- */
 
