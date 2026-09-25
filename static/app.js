@@ -292,9 +292,76 @@
     return tr;
   }
 
+  var sortMode = "new";
+  var resultsData = null;
+
+  function priceVal(s) {
+    if (s === null || s === undefined || s === "") return Infinity;
+    if (typeof s !== "string") return isNaN(s) ? Infinity : s;
+    var v = parseFloat(s.replace(/[^0-9.]/g, ""));
+    if (!isNaN(v)) return v;
+    return /free/i.test(s) ? 0 : Infinity;
+  }
+
+  function sortRows(rows, mode) {
+    rows = rows.slice();
+    if (mode === "price_asc") {
+      rows.sort(function (a, b) { return priceVal(money(a)) - priceVal(money(b)); });
+    } else if (mode === "price_desc") {
+      rows.sort(function (a, b) { return priceVal(money(b)) - priceVal(money(a)); });
+    } else {
+      rows.sort(function (a, b) {
+        if (a.new !== b.new) return a.new ? -1 : 1;
+        return (b.seen || 0) - (a.seen || 0);
+      });
+    }
+    return rows;
+  }
+
+  function scanLabel(w, mode) {
+    var base = w.new_count + " rows new since last scan";
+    if (mode === "price_asc") return base + " \u00b7 sorted: price low \u2192 high";
+    if (mode === "price_desc") return base + " \u00b7 sorted: price high \u2192 low";
+    return base + ", shown first";
+  }
+
+  function renderResultList() {
+    var list = document.getElementById("listing");
+    if (!list || !resultsData) return;
+    while (list.firstChild) list.removeChild(list.firstChild);
+    var w = resultsData.watch;
+    var label = document.getElementById("scan-label");
+    if (label) label.textContent = scanLabel(w, sortMode);
+    var rows = sortRows(resultsData.rows, sortMode);
+    if (!rows.length) {
+      list.appendChild(emptyRow("\u2014 no rows yet \u2014 the first scan is the baseline; new listings land here --", 3));
+    } else {
+      for (var i = 0; i < rows.length; i++) list.appendChild(listingRow(rows[i]));
+    }
+    var s1 = document.getElementById("sline-main");
+    if (s1) s1.textContent = "-- " + rows.length + " rows \u00b7 " + w.new_count +
+      " new since last scan \u00b7 baseline never notified --";
+  }
+
+  function initSortMenu() {
+    var host = document.getElementById("sort-bar");
+    if (!host) return;
+    var buttons = host.querySelectorAll(".sort-btn");
+    for (var i = 0; i < buttons.length; i++) {
+      buttons[i].addEventListener("click", function () {
+        sortMode = this.getAttribute("data-sort");
+        for (var j = 0; j < buttons.length; j++) {
+          buttons[j].classList.toggle("is-active", buttons[j] === this);
+        }
+        renderResultList();
+      });
+    }
+  }
+
   function initResults() {
     var params = new URLSearchParams(location.search);
     var id = params.get("watch");
+    initSortMenu();
     var btn = document.getElementById("rescan");
     if (btn && id) {
       btn.addEventListener("click", function () {
@@ -324,6 +391,7 @@
     if (list) while (list.firstChild) list.removeChild(list.firstChild);
     getJSON("/api/watches/" + id + "/results").then(function (data) {
       var w = data.watch;
+      resultsData = data;
       if (title) title.textContent = "cat watch::w" + w.id;
       var wl = document.getElementById("watch-link");
       if (wl) {
@@ -336,24 +404,7 @@
       setMeta("meta-interval", "interval", w.continuous ? (w.interval_min + "m") : "one-shot");
       setMeta("meta-last", "last scan", timeHm(w.last_scan));
       setMeta("meta-next", "next scan", w.status === "stalled" ? "stalled" : timeHm(w.next_scan));
-
-      var label = document.getElementById("scan-label");
-      if (label) label.textContent = w.new_count + " rows new since last scan, shown first";
-
-      var rows = data.rows.slice().sort(function (a, b) {
-        if (a.new !== b.new) return a.new ? -1 : 1;
-        return (b.seen || 0) - (a.seen || 0);
-      });
-      if (list) {
-        if (!rows.length) {
-          list.appendChild(emptyRow("\u2014 no rows yet \u2014 the first scan is the baseline; new listings land here --", 3));
-        } else {
-          for (var i = 0; i < rows.length; i++) list.appendChild(listingRow(rows[i]));
-        }
-      }
-      var s1 = document.getElementById("sline-main");
-      if (s1) s1.textContent = "-- " + rows.length + " rows \u00b7 " + w.new_count +
-        " new since last scan \u00b7 baseline never notified --";
+      renderResultList();
       getJSON("/api/status").then(function (st) {
         var aux = document.getElementById("sline-aux");
         if (aux && st.test_mode) aux.textContent = "-- test mode: snapshot scraping, no live fetches --";

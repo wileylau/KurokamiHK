@@ -36,7 +36,15 @@
       <span id="meta-next"><b>next scan</b>&nbsp; &hellip;</span>
     </div>
 
-    <div class="section-label" id="scan-label">&hellip;</div>
+    <div class="listing-head">
+      <span class="section-label" id="scan-label">&hellip;</span>
+      <div class="sort-bar" id="sort-bar">
+        <span class="sort-label">sort&nbsp;</span>
+        <button class="btn sort-btn is-active" type="button" data-sort="new">new</button>
+        <button class="btn sort-btn" type="button" data-sort="price_asc">low &rarr; high</button>
+        <button class="btn sort-btn" type="button" data-sort="price_desc">high &rarr; low</button>
+      </div>
+    </div>
 
     <div class="listing" id="listing"></div>
   </main>

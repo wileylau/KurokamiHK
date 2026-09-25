@@ -349,7 +349,36 @@ b, strong { font-weight: 700; }
 .out-link { color: var(--dim); text-decoration: none; font-size: 0.85rem; }
 .out-link:hover { color: var(--green-bright); }
 
-.listing-head { padding: 0 var(--space-3) var(--space-1); }
+.listing-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: 0 var(--space-3) var(--space-1);
+}
+.listing-head .section-label { padding: 0; }
+
+.sort-bar {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.sort-label {
+  color: var(--dim-2);
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+}
+.sort-btn {
+  padding: 2px 9px;
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+.sort-btn.is-active {
+  border-color: var(--green);
+  color: var(--green-bright);
+  background: rgba(56, 199, 111, 0.08);
+}
 
 /* ---------- settings / form ---------- */
 
