@@ -43,6 +43,7 @@
 - Preserve the blacklist guard (`is_blacklisted`) before appending items.
 - Wrap fragile DOM-parsing in `try/except` of `(IndexError, ValueError, AttributeError)` to skip ads/malformed items; `sys.exit(1)` on fatal states.
 - Confirm f-string compatibility (Python 3.6+); do not introduce newer syntax without bumping the floor.
+- Any further elements (screens, components, features, UI surfaces) must respect existing design changes already landed in the codebase (e.g. `styles.css` as the designated world, shared empty-state grammar, page structure) rather than introducing divergent patterns.
 
 ## Key Constraints
 - Scraping is discouraged on Carousell: scrape minimally (README guidance ~ once per 10 minutes). Treat the site as live/volatile — parsers break when markup changes.
