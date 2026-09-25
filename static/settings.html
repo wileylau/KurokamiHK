@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>kurokami — nano watches.conf</title>
+<meta name="description" content="kurokami local live-monitor: settings and watch editor.">
+<link rel="stylesheet" href="/static/styles.css">
+<script src="/static/app.js" defer></script>
+</head>
+<body data-page="settings">
+
+<div class="window">
+  <header class="bar">
+    <a class="brand" href="index.html">kurokami<span class="prompt">:~$</span></a>
+    <span class="host">127.0.0.1:8080</span>
+    <nav aria-label="surfaces">
+      <a href="index.html" data-nav="index">roster</a>
+      <a href="feed.html" data-nav="feed">feed</a>
+      <a href="settings.html" data-nav="settings">settings</a>
+    </nav>
+    <span class="clock" id="clock" aria-live="off">--:--:--</span>
+  </header>
+
+  <main>
+    <header class="page-head">
+      <h1>nano watches.conf</h1>
+      <span class="rollup">identity &middot; schedule &middot; flags</span>
+    </header>
+
+    <div class="form" id="form">
+      <fieldset>
+        <legend>identity</legend>
+        <div class="field">
+          <label for="item">item <code>-i</code></label>
+          <input type="text" id="item" value="" placeholder="e.g. Fujifilm X100 silver">
+          <span class="unit"></span>
+        </div>
+        <div class="field">
+          <label for="count">count <code>-n</code></label>
+          <input type="number" id="count" value="25" min="1">
+          <span class="unit">rows</span>
+        </div>
+        <div class="field">
+          <label for="pl">price low <code>-pl</code></label>
+          <input type="number" id="pl" value="" placeholder="&mdash;">
+          <span class="unit">HKD</span>
+        </div>
+        <div class="field">
+          <label for="ph">price high <code>-ph</code></label>
+          <input type="number" id="ph" value="" placeholder="&mdash;">
+          <span class="unit">HKD</span>
+        </div>
+      </fieldset>
+
+      <p class="form-note" id="form-note" hidden role="alert"></p>
+
+      <fieldset>
+        <legend>schedule</legend>
+        <div class="field">
+          <label for="int">interval <code>minutes</code></label>
+          <input type="number" id="int" value="10" min="1">
+          <span class="unit">min</span>
+        </div>
+        <p class="note" id="politeness-note" role="note" hidden>
+          -- politeness note: interval &lt;10m sits below the ~10m floor -- permitted, never blocked; a soft warning banner shows in the roster while it stays there --
+        </p>
+        <div class="field">
+          <label for="cont">continuous <code>yes|no</code></label>
+          <input type="text" id="cont" value="no" inputmode="text" autocomplete="off">
+          <span class="unit">type yes or no</span>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>global &mdash; inherited, read-only</legend>
+        <div class="field field-ro">
+          <label>blacklist</label>
+          <span class="value">utils/blacklist.txt &middot; lowercased keywords, filtered before results</span>
+        </div>
+        <div class="field field-ro">
+          <label>politeness floor</label>
+          <span class="value">~1 scrape / 10 min (soft) &middot; one scrape in flight, &ge;15s apart</span>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>watches on disk</legend>
+        <ul class="watch-list" id="watch-list">
+          <li class="faint">&hellip;</li>
+        </ul>
+      </fieldset>
+
+      <div class="form-actions">
+        <button class="btn btn-primary" type="button" id="save">[save watch]</button>
+        <a class="btn" href="index.html">[cancel]</a>
+      </div>
+    </div>
+  </main>
+
+  <footer class="statusline">
+    <span>-- saved watches are added to the daemon catalog; baseline scan fires immediately --</span>
+  </footer>
+</div>
+
+</body>
+</html>

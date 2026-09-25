@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>kurokami — feed</title>
+<meta name="description" content="kurokami local live-monitor: daemon feed.">
+<link rel="stylesheet" href="/static/styles.css">
+<script src="/static/app.js" defer></script>
+</head>
+<body data-page="feed">
+
+<div class="window">
+  <header class="bar">
+    <a class="brand" href="index.html">kurokami<span class="prompt">:~$</span></a>
+    <span class="host">127.0.0.1:8080</span>
+    <nav aria-label="surfaces">
+      <a href="index.html" data-nav="index">roster</a>
+      <a href="feed.html" data-nav="feed">feed</a>
+      <a href="settings.html" data-nav="settings">settings</a>
+    </nav>
+    <span class="clock" id="clock" aria-live="off">--:--:--</span>
+  </header>
+
+  <main>
+    <header class="page-head">
+      <h1>tail -f ~/.kurokami/feed</h1>
+      <span class="rollup" id="rollup">loading &hellip;</span>
+    </header>
+
+    <div class="section-label">unbounded append-only feed; baselines are never notified</div>
+
+    <div class="feed" id="feed"></div>
+  </main>
+
+  <footer class="statusline">
+    <span id="sline-main">-- &hellip; --</span>
+    <span id="sline-aux" class="faint">-- &hellip; --</span>
+  </footer>
+</div>
+
+</body>
+</html>

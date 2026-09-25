@@ -1,5 +1,7 @@
 import asyncio
 
+from .cli import main
+
+
 if __name__ == "__main__":
-    from kurokami.cli import main
     asyncio.run(main())
