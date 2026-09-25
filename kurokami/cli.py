@@ -3,7 +3,8 @@
 Preserves the documented `python kurokami.py` flows: interactive prompts,
 -t/-s parse modes, utf-8-sig CSV output, and sys.exit(1) on no-results.
 The dict form of main() is the server-side API used by the (future) bot,
-with args i, n, o, t, s, c (ph/pl accepted as optional price bounds).
+with args i, n, o, t, s, c (ph/pl accepted as optional price bounds, and
+so for the sort order: best_match, recent, price_asc, price_desc, nearby).
 '''
 
 import argparse
@@ -21,6 +22,7 @@ from .core import (
     NO_RESULTS_MSG,
     NO_VALID_ITEMS_MSG,
     SNAPSHOT_PATH,
+    SORT_OPTIONS,
     build_search_url,
     detect_item_div_class,
     load_blacklist,
@@ -67,13 +69,15 @@ def build_parser():
         help='Upper price limit')
     ps.add_argument('-pl', '--price-low', type=int,
         help='Lower price limit')
+    ps.add_argument('--sort', choices=sorted(SORT_OPTIONS), default='recent',
+        help='Sort order of the search results (default: recent)')
     return ps
 
 
 async def main(options: Union[dict, None] = None):
     os.makedirs("output", exist_ok=True)
     blacklist = load_blacklist()
-    """options keys: i (item), n (number/count), o (output), t (test), s (serialize), c (compare)"""
+    """options keys: i (item), n (number/count), o (output), t (test), s (serialize), c (compare), so (sort)"""
     if options is None:
         server_side = False
         args = build_parser().parse_args()
@@ -115,6 +119,7 @@ async def main(options: Union[dict, None] = None):
                 sys.exit(1)
         price_high = args.price_high
         price_low = args.price_low
+        sort_by = args.sort
 
     else:  # Praying that this does not result in a SSRF, used in bot.py with no user inputs yet. Validate user inputs
         server_side = True
@@ -131,6 +136,7 @@ async def main(options: Union[dict, None] = None):
         compare_file = options.get("c")
         price_high = options.get("ph")
         price_low = options.get("pl")
+        sort_by = options.get("so")
 
     if not server_side:
         print("Author: Andrew Higgins")
@@ -140,7 +146,7 @@ async def main(options: Union[dict, None] = None):
         if not server_side:
             print(f'Retrieving search results for {item_limit} items on {item}...')
         if not test:
-            url = build_search_url(item, price_low, price_high)
+            url = build_search_url(item, price_low, price_high, sort_by=sort_by)
             if not server_side:
                 print("Creating webdriver")
             search_results_soup = await request_page(url, item_limit=item_limit,

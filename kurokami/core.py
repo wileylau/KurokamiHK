@@ -44,6 +44,16 @@ LISTINGS_SELECTOR = '.asm-browse-listings'
 ITEM_DIV_SELECTOR = LISTINGS_SELECTOR + ' > div > div > div > div > div'
 SNAPSHOT_PATH = "utils/soup.pkl"
 DEFAULT_BLACKLIST_PATH = "utils/blacklist.txt"
+# Sort orders accepted by Carousell's search page (field_sort_by radio options).
+SORT_OPTIONS = {
+    'best_match': '1',
+    'recent': '3',
+    'price_asc': '4',
+    'price_desc': '5',
+    'nearby': '6',
+}
+DEFAULT_SORT = SORT_OPTIONS['recent']
+DEFAULT_SORT_NAME = 'recent'
 # Expected failures on ads or malformed items while parsing.
 PARSE_EXCEPTIONS = (IndexError, ValueError, AttributeError)
 
@@ -93,14 +103,50 @@ def parse_info(item_div, home=HOME):
             }  # 0 is discounted price, 1 is original price, if applicable
 
 
-def build_search_url(item, price_low=None, price_high=None, home=HOME):
+def normalize_sort(sort_by):
+    """Accepts a friendly sort name (SORT_OPTIONS key), a raw Carousell value
+    like '3', or None, and returns the raw value. Raises on anything else."""
+    if sort_by is None:
+        return DEFAULT_SORT
+    if isinstance(sort_by, str) and sort_by in SORT_OPTIONS:
+        return SORT_OPTIONS[sort_by]
+    sort_by = str(sort_by)
+    if sort_by in SORT_OPTIONS.values():
+        return sort_by
+    raise ValueError(
+        "Unknown sort_by %r: pick from %s or a raw value from %s"
+        % (sort_by,
+           ", ".join(sorted(SORT_OPTIONS)),
+           ", ".join(sorted(set(SORT_OPTIONS.values())))))
+
+
+def normalize_sort_name(sort_by):
+    """Inverse of normalize_sort: accepts a friendly name, a raw Carousell
+    value, or None, and returns the canonical SORT_OPTIONS name."""
+    if sort_by is None:
+        return DEFAULT_SORT_NAME
+    if isinstance(sort_by, str) and sort_by in SORT_OPTIONS:
+        return sort_by
+    sort_by = str(sort_by)
+    for name, value in SORT_OPTIONS.items():
+        if sort_by == value:
+            return name
+    raise ValueError(
+        "Unknown sort_by %r: pick from %s or a raw value from %s"
+        % (sort_by,
+           ", ".join(sorted(SORT_OPTIONS)),
+           ", ".join(sorted(set(SORT_OPTIONS.values())))))
+
+
+def build_search_url(item, price_low=None, price_high=None, home=HOME,
+                     sort_by=DEFAULT_SORT):
     subdirs = f'/search/{urllib.parse.quote(item)}'
 
     params = {
         'addRecent': 'false',
         'canChangeKeyword': 'false',
         'includeSuggestions': 'false',
-        'sort_by': '3'
+        'sort_by': normalize_sort(sort_by)
     }
     if price_low:
         params['price_start'] = price_low
@@ -193,7 +239,8 @@ def make_valid_counter(blacklist):
 
 
 async def scrape(item, count=25, *, price_low=None, price_high=None,
-                 test=False, serialize=False, blacklist=None, home=HOME):
+                 test=False, serialize=False, blacklist=None, home=HOME,
+                 sort_by=DEFAULT_SORT):
     """High-level search that returns a DataFrame of parsed listings.
 
     Uses utils/soup.pkl when test=True, otherwise drives a fresh browser
@@ -205,7 +252,7 @@ async def scrape(item, count=25, *, price_low=None, price_high=None,
     if test:
         soup = load_soup_snapshot()
     else:
-        soup = await request_page(build_search_url(item, price_low, price_high, home), count,
+        soup = await request_page(build_search_url(item, price_low, price_high, home, sort_by), count,
                                   count_valid=make_valid_counter(blacklist))
         if serialize:
             save_soup_snapshot(soup)

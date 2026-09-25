@@ -431,7 +431,7 @@ legend {
 .field label { color: var(--bone); }
 .field label code { color: var(--dim-2); font-size: 0.8em; }
 
-.field input[type="text"], .field input[type="number"] {
+.field input[type="text"], .field input[type="number"], .field select {
   font: inherit;
   font-size: 0.95rem;
   color: var(--bone-bright);
@@ -442,7 +442,13 @@ legend {
   width: 100%;
   max-width: 340px;
 }
-.field input:focus { outline: 1px solid var(--green); outline-offset: 2px; }
+.field select {
+  background: var(--ground-raise);
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+}
+.field input:focus, .field select:focus { outline: 1px solid var(--green); outline-offset: 2px; }
 
 .unit { color: var(--dim); }
 .input-note { color: var(--dim-2); font-size: 0.85rem; }

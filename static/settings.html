@@ -51,6 +51,17 @@
           <input type="number" id="ph" value="" placeholder="&mdash;">
           <span class="unit">HKD</span>
         </div>
+        <div class="field">
+          <label for="sort">sort <code>--sort</code></label>
+          <select id="sort">
+            <option value="best_match">best match</option>
+            <option value="recent" selected>recent</option>
+            <option value="price_asc">price low &rarr; high</option>
+            <option value="price_desc">price high &rarr; low</option>
+            <option value="nearby">nearby</option>
+          </select>
+          <span class="unit"></span>
+        </div>
       </fieldset>
 
       <p class="form-note" id="form-note" hidden role="alert"></p>
@@ -90,6 +101,10 @@
           <li class="faint">&hellip;</li>
         </ul>
       </fieldset>
+
+      <p class="note" id="edit-note" role="note" hidden>
+        -- editing the loaded watch &middot; save writes the changes; if the query (item / count / price / sort) changed, the diff re-baselines and a fresh scan is queued --
+      </p>
 
       <div class="form-actions">
         <button class="btn btn-primary" type="button" id="save">[save watch]</button>

@@ -70,13 +70,14 @@ class Watch:
     """One saved search + its schedule and diff state. Plain class (3.6)."""
 
     __slots__ = ("id", "item", "count", "price_low", "price_high",
-                 "interval_min", "continuous", "status",
+                 "interval_min", "continuous", "sort_by", "status",
                  "last_scan", "next_scan", "consecutive_failures",
                  "baseline_done", "prev_scan_uids", "last_new_uids",
                  "last_rows", "queued")
 
     def __init__(self, wid, item, count, price_low=None, price_high=None,
-                 interval_min=DEFAULT_INTERVAL_MIN, continuous=False):
+                 interval_min=DEFAULT_INTERVAL_MIN, continuous=False,
+                 sort_by=None):
         self.id = wid
         self.item = item
         self.count = count
@@ -84,6 +85,7 @@ class Watch:
         self.price_high = price_high
         self.interval_min = interval_min
         self.continuous = continuous
+        self.sort_by = kurokami.normalize_sort_name(sort_by)
         self.status = "scheduled"   # idle/scheduled/queued/running/stalled
         self.last_scan = None
         self.next_scan = time.time()  # baseline fires immediately
@@ -161,7 +163,8 @@ class Daemon:
                 w = Watch(wid, state["item"], state["count"],
                           state.get("price_low"), state.get("price_high"),
                           state.get("interval_min", DEFAULT_INTERVAL_MIN),
-                          state.get("continuous", False))
+                          state.get("continuous", False),
+                          state.get("sort_by"))
                 w.status = state.get("status", "scheduled")
                 w.last_scan = state.get("last_scan")
                 w.next_scan = state.get("next_scan")
@@ -179,6 +182,7 @@ class Daemon:
                     query.get("count", 25),
                     price_low=query.get("price_low"),
                     price_high=query.get("price_high"),
+                    sort_by=query.get("sort_by"),
                 )
         # restore the feed tail so /api/feed survives restarts
         if os.path.exists(self._feed_path()):
@@ -212,6 +216,7 @@ class Daemon:
             "id": w.id, "item": w.item, "count": w.count,
             "price_low": w.price_low, "price_high": w.price_high,
             "interval_min": w.interval_min, "continuous": w.continuous,
+            "sort_by": w.sort_by,
             "status": w.status, "last_scan": w.last_scan,
             "next_scan": w.next_scan,
             "consecutive_failures": w.consecutive_failures,
@@ -232,9 +237,10 @@ class Daemon:
     # ---------- watch catalog API ----------
 
     def add_watch(self, item, count, price_low=None, price_high=None,
-                  interval_min=DEFAULT_INTERVAL_MIN, continuous=False):
+                  interval_min=DEFAULT_INTERVAL_MIN, continuous=False,
+                  sort_by=None):
         w = Watch(self._next_id, item, count, price_low, price_high,
-                  interval_min, continuous)
+                  interval_min, continuous, sort_by)
         w.status = "queued"  # baseline scan is queued immediately on add
         w.queued = True
         self._watches[w.id] = w
@@ -261,6 +267,50 @@ class Daemon:
     def submit_adhoc(self, coro):
         """Enqueue any coroutine (a one-off scrape) on the same politeness queue."""
         self._queue.put_nowait(("adhoc", coro))
+
+    def update_watch(self, wid, item, count, price_low, price_high,
+                     interval_min, continuous, sort_by):
+        """Rewrite a watch's query/schedule and persist. Returns the watch or
+        None. Changing the query identity resets the diff baseline and queues
+        a fresh scan (a running or already-queued watch skips the requeue; the
+        in-flight scrape keeps its snapshot, later scans use the new fields)."""
+        w = self._watches.get(wid)
+        if w is None:
+            return None
+        old_identity = (w.item, w.count, w.price_low, w.price_high, w.sort_by)
+        new_identity = (item, count, price_low, price_high, sort_by)
+        w.item = item
+        w.count = count
+        w.price_low = price_low
+        w.price_high = price_high
+        w.sort_by = kurokami.normalize_sort_name(sort_by)
+        w.interval_min = interval_min
+        w.continuous = continuous
+        if new_identity != old_identity:
+            w.baseline_done = False
+            w.prev_scan_uids = set()
+            w.last_new_uids = set()
+            w.last_rows = []
+            w.consecutive_failures = 0
+            if not w.queued and w.status != "running":
+                w.status = "queued"
+                w.next_scan = time.time()
+                w.queued = True
+                self._queue.put_nowait(("watch", w))
+                self._emit(FEED_QUEUED,
+                           "watch w%d edited \u00b7 query changed, fresh scan queued"
+                           % w.id, watch=w.id)
+            else:
+                self._emit(FEED_OK,
+                           "watch w%d edited \u00b7 query changed, scan pending"
+                           % w.id, watch=w.id)
+        else:
+            if w.status == "scheduled":
+                w.next_scan = time.time() + w.interval_min * 60
+            self._emit(FEED_OK, "watch w%d edited \u00b7 schedule updated"
+                       % w.id, watch=w.id)
+        self._persist(w)
+        return w
 
     def retry(self, wid):
         w = self._watches.get(wid)
@@ -365,7 +415,7 @@ class Daemon:
             df = await kurokami.scrape(
                 w.item, count=w.count,
                 price_low=w.price_low, price_high=w.price_high,
-                test=self.test_mode,
+                test=self.test_mode, sort_by=w.sort_by,
             )
             self._record_success(w, self._normalize_rows(df))
         except Exception as exc:
@@ -419,6 +469,7 @@ class Daemon:
             "id": w.id, "item": w.item, "count": w.count,
             "price_low": w.price_low, "price_high": w.price_high,
             "interval_min": w.interval_min, "continuous": w.continuous,
+            "sort_by": w.sort_by,
             "status": w.status, "last_scan": w.last_scan,
             "next_scan": w.next_scan,
             "consecutive_failures": w.consecutive_failures,

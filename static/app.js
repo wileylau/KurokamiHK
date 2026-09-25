@@ -68,6 +68,19 @@
     });
   }
 
+  function patchJSON(url, body) {
+    return fetch(url, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body || {})
+    }).then(function (r) {
+      if (!r.ok) {
+        return readJSON(r).then(function (d) { throw new Error((d && d.error) || ("HTTP " + r.status)); });
+      }
+      return r.status === 204 ? null : r.json();
+    });
+  }
+
   function el(tag, cls, text) {
     var node = document.createElement(tag);
     if (cls) node.className = cls;
@@ -551,10 +564,13 @@
   /* settings (settings.html)                                            */
   /* ------------------------------------------------------------------ */
 
+  var editingWatch = null;  // id being edited via the form, or null for create
+
   function initSettings() {
     var form = document.getElementById("form");
     var note = document.getElementById("form-note");
     var save = document.getElementById("save");
+    var editNote = document.getElementById("edit-note");
     if (!form || !note || !save) return;
 
     var inputs = {
@@ -562,6 +578,7 @@
       count: document.getElementById("count"),
       pl: document.getElementById("pl"),
       ph: document.getElementById("ph"),
+      sort: document.getElementById("sort"),
       int: document.getElementById("int"),
       cont: document.getElementById("cont")
     };
@@ -603,14 +620,21 @@
         price_low: inputs.pl.value === "" ? null : parseInt(inputs.pl.value, 10),
         price_high: inputs.ph.value === "" ? null : parseInt(inputs.ph.value, 10),
         interval_min: parseInt(inputs.int.value, 10),
-        continuous: String(inputs.cont.value).trim().toLowerCase() === "yes"
+        continuous: String(inputs.cont.value).trim().toLowerCase() === "yes",
+        sort_by: inputs.sort ? inputs.sort.value : "recent"
       };
       save.disabled = true;
       var old = save.textContent;
       save.textContent = "[saving \u2026]";
-      postJSON("/api/watches", payload).then(function (w) {
-        save.textContent = "[saved \u2026 watch w" + w.id + " created]";
-        setTimeout(function () { location.href = "results.html?watch=" + w.id; }, 900);
+      var req = editingWatch
+        ? patchJSON("/api/watches/" + editingWatch, payload)
+        : postJSON("/api/watches", payload);
+      req.then(function (w) {
+        var made = editingWatch;
+        editingWatch = null;
+        if (editNote) editNote.hidden = true;
+        save.textContent = made ? "[saved \u2026 w" + made + " updated \u00b7 rescan queued]" : "[saved \u2026 watch w" + w.id + " created]";
+        setTimeout(function () { location.href = "results.html?watch=" + (made || w.id); }, 900);
       })["catch"](function (err) {
         save.disabled = false;
         save.textContent = old;
@@ -620,6 +644,38 @@
     });
 
     loadWatchList();
+  }
+
+  var SORT_LABEL = {
+    "best_match": "best match",
+    "recent": "recent",
+    "price_asc": "low \u2192 high",
+    "price_desc": "high \u2192 low",
+    "nearby": "nearby"
+  };
+
+  function enterEdit(w) {
+    editingWatch = w.id;
+    var f = function (sel, val) {
+      var n = document.getElementById(sel);
+      if (n) n.value = val;
+    };
+    f("item", w.item);
+    f("count", w.count);
+    f("pl", w.price_low === null || w.price_low === undefined ? "" : w.price_low);
+    f("ph", w.price_high === null || w.price_high === undefined ? "" : w.price_high);
+    f("int", w.interval_min);
+    f("cont", w.continuous ? "yes" : "no");
+    f("sort", w.sort_by || "recent");
+    var note2 = document.getElementById("edit-note");
+    if (note2) {
+      note2.textContent = "-- editing w" + w.id + " \u00b7 save writes the changes; if the query changed, the diff re-baselines and a fresh scan is queued --";
+      note2.hidden = false;
+    }
+    var save2 = document.getElementById("save");
+    if (save2) save2.textContent = "[save changes]";
+    var form2 = document.getElementById("form");
+    if (form2) form2.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   function loadWatchList() {
@@ -642,9 +698,15 @@
         li2.appendChild(document.createTextNode(" " + w.item));
         var st = el("span", "w-state",
           (w.continuous ? ("continuous \u00b7 " + w.interval_min + "m") : "one-shot") +
+          " \u00b7 sort " + (SORT_LABEL[w.sort_by] || w.sort_by) +
           (w.status === "stalled" ? " \u2014 stalled \u2014 retry needed" : "") +
           (w.below_floor ? " \u00b7 below floor" : ""));
         li2.appendChild(st);
+        var eb = el("button", "kill", "[edit]");
+        eb.type = "button";
+        eb.title = "load watch w" + w.id + " into the form";
+        eb.addEventListener("click", function (ev) { enterEdit(w); ev.preventDefault(); });
+        li2.appendChild(eb);
         li2.appendChild(killBtn(w.id, loadWatchList));
         list.appendChild(li2);
       }

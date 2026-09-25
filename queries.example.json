@@ -1,6 +1,6 @@
 {
   "queries": [
-    {"item": "shirakami fubuki", "count": 10, "price_low": null, "price_high": null},
-    {"item": "hololive figure", "count": 25, "price_low": 100, "price_high": 500}
+    {"item": "shirakami fubuki", "count": 10, "price_low": null, "price_high": null, "sort_by": "recent"},
+    {"item": "hololive figure", "count": 25, "price_low": 100, "price_high": 500, "sort_by": "price_asc"}
   ]
 }

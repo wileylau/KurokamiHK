@@ -19,7 +19,7 @@ import server
 
 RESULTS = []
 
-STATE = {"calls": {}}  # item -> call counter for the fake scraper
+STATE = {"calls": {}, "sorts": {}}  # item -> call counter / sort_by for the fake scraper
 
 
 def check(name, cond, extra=""):
@@ -41,9 +41,11 @@ def _rows(item, count):
 
 
 async def fake_scrape(item, count=25, *, price_low=None, price_high=None,
-                      test=False, serialize=False, blacklist=None, home=None):
+                      test=False, serialize=False, blacklist=None, home=None,
+                      sort_by=None):
     n = STATE["calls"].get(item, 0)
     STATE["calls"][item] = n + 1
+    STATE["sorts"][item] = sort_by
     if item == "fail":
         raise kurokami.NoResultsError("forced failure")
     if item == "flaky" and n < 2:
@@ -101,6 +103,8 @@ async def main():
         check("400: watch interval below floor", r.status == 400)
         r = await client.post("/api/watches", json={"item": "x", "count": 1, "continuous": "maybe"})
         check("400: watch bad continuous", r.status == 400)
+        r = await client.post("/api/watches", json={"item": "x", "count": 1, "sort_by": "bogus"})
+        check("400: watch bad sort_by", r.status == 400)
 
         # adhoc search job on the shared politeness queue
         r = await client.post("/api/search", json={"item": "test item", "count": 3, "price_low": 10, "price_high": 20})
@@ -127,14 +131,18 @@ async def main():
         # ---- daemon: watch lifecycle ----
         r = await client.post("/api/watches", json={"item": "cam", "count": 3,
                                                     "price_low": 10, "price_high": 20,
-                                                    "interval_min": 10, "continuous": False})
+                                                    "interval_min": 10, "continuous": False,
+                                                    "sort_by": "4"})
         w = await r.json()
-        check("POST /api/watches -> 202 queued", r.status == 202 and w["status"] == "queued")
+        check("POST /api/watches -> 202 queued + sort normalized",
+              r.status == 202 and w["status"] == "queued" and w["sort_by"] == "price_asc")
         wid = w["id"]
 
         w = await _wait_watch(client, wid, done=lambda x: x["row_count"] == 3)
         check("baseline scan runs to 3 rows", w["row_count"] == 3 and w["baseline_done"] is True)
         check("baseline records no new", w["new_count"] == 0)
+        check("baseline scan passes the watch sort_by to scrape",
+              STATE["sorts"].get("cam") == "price_asc")
 
         history = os.path.join(tmp.name, "watches", str(wid), "history.csv")
         check("history.csv written with utf-8-sig BOM", os.path.exists(history) and open(history, "rb").read(3) == b"\xef\xbb\xbf")
@@ -169,6 +177,20 @@ async def main():
               w is not None and w["status"] == "idle")
         r = await client.post("/api/watches/9999/rescan")
         check("rescan unknown watch -> 404", r.status == 404)
+
+        # daemon: edit (PATCH) — query change resets baseline + requeues
+        r = await client.patch("/api/watches/" + str(widb), json={"sort_by": "5"})
+        w3 = await r.json()
+        check("PATCH watch sort -> 202 + normalized", r.status == 202 and w3["sort_by"] == "price_desc")
+        w = await _wait_watch(client, widb, done=lambda x: x["status"] == "idle", rounds=80)
+        check("edited query rescan runs back to idle", w is not None and w["status"] == "idle")
+        check("edited query re-baselined", w["baseline_done"] is True)
+        check("edited query sorts the next scrape", STATE["sorts"].get("flaky") == "price_desc")
+
+        r = await client.patch("/api/watches/9999", json={"item": "x"})
+        check("PATCH unknown watch -> 404", r.status == 404)
+        r = await client.patch("/api/watches/" + str(widb), json={"sort_by": "bogus"})
+        check("PATCH bad sort_by -> 400", r.status == 400)
 
         # ---- daemon: feed ----
         r = await client.get("/api/feed")

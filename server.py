@@ -137,7 +137,12 @@ def _validate_watch(body):
     else:
         return _bad_request('"continuous" must be yes|no'), None
 
-    return None, (item, count, price_low, price_high, interval, continuous)
+    try:
+        sort_by = kurokami.normalize_sort_name(body.get("sort_by"))
+    except ValueError as exc:
+        return _bad_request(str(exc)), None
+
+    return None, (item, count, price_low, price_high, interval, continuous, sort_by)
 
 
 async def _run_job(job, app):
@@ -201,7 +206,8 @@ async def handle_config(request):
     d = request.app["daemon"]
     return web.json_response({
         "queries": [{"id": w.id, "item": w.item, "count": w.count,
-                     "price_low": w.price_low, "price_high": w.price_high}
+                     "price_low": w.price_low, "price_high": w.price_high,
+                     "sort_by": w.sort_by}
                     for w in d.watches()],
         "test_mode": d.test_mode,
     })
@@ -227,9 +233,10 @@ async def handle_create_watch(request):
     error, payload = _validate_watch(body)
     if error is not None:
         return error
-    item, count, price_low, price_high, interval, continuous = payload
+    item, count, price_low, price_high, interval, continuous, sort_by = payload
     d = request.app["daemon"]
-    wid = d.add_watch(item, count, price_low, price_high, interval, continuous)
+    wid = d.add_watch(item, count, price_low, price_high, interval, continuous,
+                      sort_by)
     return web.json_response(d.watch_dict(d.get(wid)), status=202)
 
 
@@ -248,6 +255,42 @@ async def handle_delete_watch(request):
     if not d.remove_watch(int(request.match_info["id"])):
         return web.json_response({"error": "Unknown watch"}, status=404)
     return web.json_response({}, status=204)
+
+
+async def handle_update_watch(request):
+    """PATCH /api/watches/{id} -> edit query/schedule; missing fields keep
+    their current values. Changing the query resets the diff baseline and
+    queues a fresh scan."""
+    d = request.app["daemon"]
+    try:
+        wid = int(request.match_info["id"])
+    except ValueError:
+        return _bad_request("watch id must be an integer")
+    w = d.get(wid)
+    if w is None:
+        return web.json_response({"error": "Unknown watch"}, status=404)
+    try:
+        body = await request.json()
+    except json.JSONDecodeError:
+        return _bad_request("Body must be valid JSON")
+    if not isinstance(body, dict):
+        return _bad_request("Expected a JSON object body")
+    merged = {
+        "item": body.get("item", w.item),
+        "count": body.get("count", w.count),
+        "price_low": body.get("price_low", w.price_low),
+        "price_high": body.get("price_high", w.price_high),
+        "interval_min": body.get("interval_min", w.interval_min),
+        "continuous": body.get("continuous", w.continuous),
+        "sort_by": body.get("sort_by", w.sort_by),
+    }
+    error, payload = _validate_watch(merged)
+    if error is not None:
+        return error
+    item, count, price_low, price_high, interval, continuous, sort_by = payload
+    updated = d.update_watch(wid, item, count, price_low, price_high,
+                             interval, continuous, sort_by)
+    return web.json_response(d.watch_dict(updated), status=202)
 
 
 async def handle_retry_watch(request):
@@ -346,6 +389,7 @@ def make_app(test_mode=None, queries_path=DEFAULT_QUERIES_PATH,
     app.router.add_post("/api/watches", handle_create_watch)
     app.router.add_get("/api/watches/{id}", handle_watch)
     app.router.add_delete("/api/watches/{id}", handle_delete_watch)
+    app.router.add_patch("/api/watches/{id}", handle_update_watch)
     app.router.add_post("/api/watches/{id}/retry", handle_retry_watch)
     app.router.add_post("/api/watches/{id}/rescan", handle_rescan_watch)
     app.router.add_get("/api/watches/{id}/results", handle_results)
