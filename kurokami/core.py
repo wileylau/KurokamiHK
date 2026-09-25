@@ -141,9 +141,11 @@ def find_item_divs(soup):
 
 
 def parse_items(item_divs, blacklist, item_limit, home=HOME):
-    """Parses listing divs into dicts, applying the blacklist and stopping at
-    item_limit valid items. Raises NoValidItemsError if none survive."""
+    """Parses listing divs into dicts, applying the blacklist, keeping the
+    first row per uid, and stopping at item_limit valid items. Raises
+    NoValidItemsError if none survive."""
     items = []
+    seen_uids = set()
     for item_div in item_divs:
         try:
             item_data = parse_info(item_div, home)
@@ -152,12 +154,42 @@ def parse_items(item_divs, blacklist, item_limit, home=HOME):
         if (is_blacklisted(item_data['item_name'], blacklist)
                 or is_blacklisted(item_data['seller_name'], blacklist)):
             continue
+        if item_data['uid'] in seen_uids:
+            continue
+        seen_uids.add(item_data['uid'])
         items.append(item_data)
         if len(items) >= item_limit:
             break
     if not items:
         raise NoValidItemsError(NO_VALID_ITEMS_MSG)
     return items
+
+
+def make_valid_counter(blacklist):
+    """Builds a count_valid(soup) closure for request_page.
+
+    Returns how many distinct uids on a parsed page survive parsing and the
+    blacklist, so the browser loop keeps loading until item_limit useful
+    results are in sight instead of stopping at a raw div count."""
+    seen = set()
+
+    def _count_valid(soup):
+        try:
+            item_divs = find_item_divs(soup)
+        except NoResultsError:
+            return len(seen)
+        for item_div in item_divs:
+            try:
+                item_data = parse_info(item_div)
+            except PARSE_EXCEPTIONS:
+                continue  # Skip advertisements or malformed items
+            if (is_blacklisted(item_data['item_name'], blacklist)
+                    or is_blacklisted(item_data['seller_name'], blacklist)):
+                continue
+            seen.add(item_data['uid'])
+        return len(seen)
+
+    return _count_valid
 
 
 async def scrape(item, count=25, *, price_low=None, price_high=None,
@@ -168,14 +200,15 @@ async def scrape(item, count=25, *, price_low=None, price_high=None,
     session (and serializes the page when serialize=True). Raises
     NoResultsError / NoValidItemsError instead of writing output.
     """
+    if blacklist is None:
+        blacklist = load_blacklist()
     if test:
         soup = load_soup_snapshot()
     else:
-        soup = await request_page(build_search_url(item, price_low, price_high, home), count)
+        soup = await request_page(build_search_url(item, price_low, price_high, home), count,
+                                  count_valid=make_valid_counter(blacklist))
         if serialize:
             save_soup_snapshot(soup)
-    if blacklist is None:
-        blacklist = load_blacklist()
     return pd.DataFrame(parse_items(find_item_divs(soup), blacklist, count, home))
 
 

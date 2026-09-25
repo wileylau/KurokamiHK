@@ -18,20 +18,18 @@ import pandas as pd
 
 from .browser import request_page
 from .core import (
-    HOME,
     NO_RESULTS_MSG,
     NO_VALID_ITEMS_MSG,
-    PARSE_EXCEPTIONS,
     SNAPSHOT_PATH,
     build_search_url,
     detect_item_div_class,
-    is_blacklisted,
     load_blacklist,
+    make_valid_counter,
     new_rows,
-    parse_info,
+    parse_items,
     save_soup_snapshot,
 )
-from .exceptions import NoResultsError
+from .exceptions import NoResultsError, NoValidItemsError
 
 FILE_REG = r'^[A-Za-z0-9_\-]+\.csv$'
 
@@ -145,7 +143,8 @@ async def main(options: Union[dict, None] = None):
             url = build_search_url(item, price_low, price_high)
             if not server_side:
                 print("Creating webdriver")
-            search_results_soup = await request_page(url, item_limit=item_limit)
+            search_results_soup = await request_page(url, item_limit=item_limit,
+                                                     count_valid=make_valid_counter(blacklist))
             if not server_side:
                 print(f'Target reached or button exhausted.')
             if serialize:
@@ -168,21 +167,9 @@ async def main(options: Union[dict, None] = None):
         print(NO_RESULTS_MSG)
         sys.exit(1)
 
-    items_list = []
-    for item_div in item_divs:
-        try:
-            item_data = parse_info(item_div, home=HOME)
-            if (is_blacklisted(item_data['item_name'], blacklist)
-                    or is_blacklisted(item_data['seller_name'], blacklist)):
-                continue
-            items_list.append(item_data)
-        except PARSE_EXCEPTIONS:
-            continue  # Skip advertisements or malformed items
-
-        if len(items_list) >= item_limit:
-            break
-
-    if not items_list:
+    try:
+        items_list = parse_items(item_divs, blacklist, item_limit)
+    except NoValidItemsError:
         print(NO_VALID_ITEMS_MSG)
         sys.exit(1)
 

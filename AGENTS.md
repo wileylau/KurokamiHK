@@ -11,8 +11,8 @@
 
 ## Directory Mapping
 - `kurokami/__init__.py` — Public API exports: `scrape`, `parse_items`, `new_rows`, `main`, exceptions, and the lower-level `request_page` / `parse_info` / `find_item_divs` / `load_blacklist` / snapshot helpers.
-- `kurokami/core.py` — Pure library (keeps the Carousell HTML layout docstring): URL building, blacklist, `parse_info`, `find_item_divs`/`parse_items`, high-level `async scrape()` (returns a DataFrame, never writes output), `new_rows()` diff.
-- `kurokami/browser.py` — `request_page()`: drives Chrome, clicks "Show more results" until the item target is met (min ~1.1x for ads/duplicates), returns the soup.
+- `kurokami/core.py` — Pure library (keeps the Carousell HTML layout docstring): URL building, blacklist, `parse_info`, `find_item_divs`/`parse_items` (keeps the first row per uid; `make_valid_counter` builds the browser-loop counter), high-level `async scrape()` (returns a DataFrame, never writes output), `new_rows()` diff.
+- `kurokami/browser.py` — `request_page()`: drives Chrome, clicks "Show more results" until `count_valid(soup)` (a core-built blacklist-aware distinct-`uid` counter; falls back to the raw 1.1x count when absent) reaches the item target, returns the soup.
 - `kurokami/cli.py` — `async def main(options)` preserving CLI behaviour: argparse/menu, interactive prompts, `utf-8-sig` CSV output, `sys.exit(1)` on no-results. The dict form is a server-side API used by the (future) bot, with args `i`, `n`, `o`, `t`, `s`, `c` (`ph`/`pl` optional).
 - `kurokami/exceptions.py` — `KurokamiError` base plus `NoResultsError`, `NoValidItemsError`; core raises these and the CLI converts them to exit 1.
 - `kurokami/__main__.py`, `kurokami.py` — entry points for `python -m kurokami` / `python kurokami.py`.

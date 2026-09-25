@@ -13,8 +13,15 @@ from selenium.webdriver.common.by import By
 from selenium.common.exceptions import TimeoutException
 
 
-async def request_page(url, item_limit):
-    """ Returns BeautifulSoup4 Objects (soup) based on item count """
+async def request_page(url, item_limit, count_valid=None):
+    """Returns BeautifulSoup4 Object (soup) based on item count.
+
+    When count_valid is provided (a callable taking a parsed soup and
+    returning the number of useful results on it), the loop keeps clicking
+    "Show more results" until that count reaches item_limit, so the blacklist
+    is applied before scraping completes. Otherwise the raw div count is used
+    (only when the blacklist is absent).
+    """
 
     opts = Options()
     opts.add_argument("--log-level=3")
@@ -27,9 +34,14 @@ async def request_page(url, item_limit):
     timeout = 10
 
     while True:
-        current_items = driver.find_elements(By.CSS_SELECTOR, ".asm-browse-listings > div > div > div")
+        soup = BeautifulSoup(driver.page_source, "html.parser")
+        if count_valid is None:
+            current_items = driver.find_elements(By.CSS_SELECTOR, ".asm-browse-listings > div > div > div")
+            done = len(current_items) >= int(item_limit * 1.1)
+        else:
+            done = count_valid(soup) >= item_limit
 
-        if len(current_items) >= int(item_limit * 1.1):
+        if done:
             break
 
         try:
