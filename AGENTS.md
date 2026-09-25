@@ -21,7 +21,7 @@
 - `static/` — the runnable frontend surfaces (tickets 006 + 008): plain HTML/CSS/JS, no build step. `index.html` (roster), `results.html?watch=ID` (per-watch tail), `feed.html`, `settings.html`; `app.js` fetches the API and renders (each page has `data-page`); `styles.css` is the designed world. Empty states and the test-mode label read in the same grammar.
 - `queries.example.json` — committed template for the gitignored `queries.json` config.
 - `test_server.py` — standalone smoke script (aiohttp test utils, `kurokami.scrape` monkeypatched so no live fetch; no test framework needed; temp data dir; 46 checks).
-- `utils/blacklist.txt` — Lowercased keyword blacklist; filtered out of results.
+- `utils/blacklist.txt` — Lowercased keyword blacklist; filtered out of results. Matched against item titles and seller names (`is_blacklisted` on both in `core.py`/`cli.py`).
 - `utils/soup.pkl` — Pickled BS4 snapshot for offline parse debugging (`-t` / `-s` modes).
 - `output/` — Daemon storage (watches/ + feed.jsonl), gitignored. Timestamped CLI CSVs also land here.
 - `requirements.txt` — Unpinned dependencies.

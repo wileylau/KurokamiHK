@@ -172,7 +172,8 @@ async def main(options: Union[dict, None] = None):
     for item_div in item_divs:
         try:
             item_data = parse_info(item_div, home=HOME)
-            if is_blacklisted(item_data['item_name'], blacklist):
+            if (is_blacklisted(item_data['item_name'], blacklist)
+                    or is_blacklisted(item_data['seller_name'], blacklist)):
                 continue
             items_list.append(item_data)
         except PARSE_EXCEPTIONS:

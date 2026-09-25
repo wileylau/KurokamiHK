@@ -149,7 +149,8 @@ def parse_items(item_divs, blacklist, item_limit, home=HOME):
             item_data = parse_info(item_div, home)
         except PARSE_EXCEPTIONS:
             continue  # Skip advertisements or malformed items
-        if is_blacklisted(item_data['item_name'], blacklist):
+        if (is_blacklisted(item_data['item_name'], blacklist)
+                or is_blacklisted(item_data['seller_name'], blacklist)):
             continue
         items.append(item_data)
         if len(items) >= item_limit:
