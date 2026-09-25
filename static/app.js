@@ -78,6 +78,10 @@
   function money(row) {
     var p = row.price;
     if (Array.isArray(p)) p = p[0];
+    if (typeof p === "string" && p.charAt(0) === "[") {
+      var m = p.match(/^\s*\[\s*['"]([^'"]*)['"]/);
+      if (m) p = m[1];
+    }
     return p ? String(p) : "--";
   }
 
